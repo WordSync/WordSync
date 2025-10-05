@@ -142,7 +142,17 @@ chrome.runtime.onInstalled.addListener(function(){
             console.log(chrome.runtime.lastError)
         }
     })
+    // 安装后安排每日自动同步
+    scheduleAutoSyncAt4AM();
+    // 安装时也做一次补偿检测
+    checkAndRunCatchup();
 })
+
+// 浏览器启动时，确保闹钟仍然存在
+chrome.runtime.onStartup && chrome.runtime.onStartup.addListener(() => {
+    scheduleAutoSyncAt4AM();
+    checkAndRunCatchup();
+});
 
 chrome.runtime.onMessage.addListener(function(request, sender, sendResponse){
     console.log(request, sender);
@@ -411,6 +421,104 @@ function verifyCookiesValidity(cookieString, callback) {
     .catch(error => {
         console.error("❌ cookies验证出错:", error);
         callback(false);
+    });
+}
+
+// === 自动同步（每日 04:00） ===
+const AUTO_ALARM_NAME = 'bbdc-autosync-4am';
+
+function getLocalNext4AMTimeMs(){
+    const now = new Date();
+    const next = new Date(now);
+    next.setHours(4, 0, 0, 0);
+    if (next.getTime() <= now.getTime()) {
+        // 已过今天 4 点，安排明天
+        next.setDate(next.getDate() + 1);
+    }
+    return next.getTime();
+}
+
+function getMostRecent4AMTimeMs(){
+    const now = new Date();
+    const recent = new Date(now);
+    recent.setHours(4, 0, 0, 0);
+    if (recent.getTime() > now.getTime()) {
+        // 还没到今天4点，则回退到昨天4点
+        recent.setDate(recent.getDate() - 1);
+    }
+    return recent.getTime();
+}
+
+function scheduleAutoSyncAt4AM(){
+    const when = getLocalNext4AMTimeMs();
+    // 每天触发一次
+    try {
+        // 先清除可能存在的旧闹钟
+        chrome.alarms.clear(AUTO_ALARM_NAME);
+        // 创建重复闹钟，使用 delayInMinutes 而不是 when
+        const delayInMinutes = Math.round((when - Date.now()) / (1000 * 60));
+        chrome.alarms.create(AUTO_ALARM_NAME, { 
+            delayInMinutes: delayInMinutes,
+            periodInMinutes: 24 * 60 
+        });
+        console.log('[autosync] alarm scheduled in', delayInMinutes, 'minutes, then every 24h');
+    } catch (e) {
+        console.warn('[autosync] schedule failed:', e);
+    }
+}
+
+chrome.alarms && chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm && alarm.name === AUTO_ALARM_NAME) {
+        console.log('[autosync] alarm fired');
+        performAutoSync();
+    }
+});
+
+function getCurrentTimestampForBg(){
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hour = String(now.getHours()).padStart(2, '0');
+    const minute = String(now.getMinutes()).padStart(2, '0');
+    return `${year}${month}${day}${hour}${minute}`;
+}
+
+function performAutoSync(){
+    // 读取已保存的单词并走与手动相同的提交流程
+    chrome.storage.sync.get('words', (data) => {
+        const words = Array.isArray(data && data.words) ? data.words : [];
+        const sorted = words.slice().sort();
+        const wordList = sorted.join(',');
+        const payload = {
+            wordList,
+            desc: getCurrentTimestampForBg(),
+            name: 'wordsync'
+        };
+        submitToBbdc(payload, (res) => {
+            console.log('[autosync] submit result:', res);
+            // 记录本次自动同步时间，用于启动时补偿判断
+            const nowMs = Date.now();
+            chrome.storage.local.set({ autosyncLastRunMs: nowMs }, () => {
+                if (chrome.runtime.lastError) {
+                    console.warn('[autosync] record last run failed:', chrome.runtime.lastError);
+                }
+            });
+        });
+    });
+}
+
+// 启动时检查是否错过了最近一次计划（4点）——若错过则立即补偿执行一次
+function checkAndRunCatchup(){
+    const recent4am = getMostRecent4AMTimeMs();
+    chrome.storage.local.get('autosyncLastRunMs', (data) => {
+        const lastRun = (data && data.autosyncLastRunMs) || 0;
+        if (lastRun < recent4am) {
+            console.log('[autosync] missed last 4AM run, running catch-up now');
+            performAutoSync();
+        } else {
+            console.log('[autosync] no catch-up needed. lastRun=', new Date(lastRun).toString());
+        }
     });
 }
 

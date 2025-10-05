@@ -10,7 +10,8 @@
   "permissions": [
     "cookies",
     "tabs",
-    "storage"
+    "storage",
+    "alarms"
   ]
   ,
   "content_scripts": [
