@@ -157,7 +157,7 @@ class Tip {
           </div>
           <div class="toolbar-right">
             <button type="button" class="audio-btn" id="play-audio">发音</button>
-            <button type="button" class="add-btn" id="add-words">添加单词</button>
+            <button type="button" class="add-btn" id="add-words">添加单词 (⌥ + A)</button>
           </div>
         </div>
         

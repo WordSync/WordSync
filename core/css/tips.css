@@ -117,9 +117,9 @@
 }
 
 .add-btn {
-  background-color: #f5f5f5;
-  color: #111;
-  border: 1px solid rgba(0,0,0,0.08);
+  background-color: #2f7d32;
+  color: #ffffff;
+  border: 0;
   padding: 4px 10px;
   height: 28px;
   border-radius: 6px;
@@ -129,13 +129,17 @@
 }
 
 .add-btn:hover {
-  background-color: #efefef;
+  background-color: #2a6f2c;
+}
+
+.add-btn:active {
+  background-color: #255f27;
 }
 
 .audio-btn {
-  background-color: #2f7d32;
-  color: #ffffff;
-  border: 0;
+  background-color: #f5f5f5;
+  color: #111;
+  border: 1px solid rgba(0,0,0,0.08);
   padding: 4px 12px;
   height: 28px;
   border-radius: 6px;
@@ -145,11 +149,7 @@
 }
 
 .audio-btn:hover {
-  background-color: #2a6f2c;
-}
-
-.audio-btn:active {
-  background-color: #255f27;
+  background-color: #efefef;
 }
 
 /* provider 下拉框样式 */
