@@ -163,6 +163,9 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse){
         case "log-bbdc-cookies":
             logBbdcCookies(sendResponse)
             break;
+        case "get-bbdc-cookies":
+            getBbdcCookiesPayload(sendResponse)
+            break;
         case "submit-to-bbdc":
             submitToBbdc(request, sendResponse)
             break;
@@ -197,6 +200,21 @@ function logBbdcCookies(sendResponse){
         console.log("[bbdc.cn cookies - array]", cookies);
         console.log("[bbdc.cn cookies - header]", cookieString);
         sendResponse({success:true, cookies, cookieString});
+    })
+}
+
+// 以 bbdc.js 预期格式返回 cookies payload（对象 + header 字符串）
+function getBbdcCookiesPayload(sendResponse){
+    const url = "https://bbdc.cn/";
+    chrome.cookies.getAll({url:url,path:"/",domain:".bbdc.cn"}, (cookies) => {
+        if (chrome.runtime.lastError) {
+            sendResponse({success:false, error: chrome.runtime.lastError.message});
+            return;
+        }
+        const cookieMap = {};
+        cookies.forEach(c => { cookieMap[c.name] = c.value; });
+        const cookieString = cookies.map(c => c.name + "=" + c.value).join('; ');
+        sendResponse({success:true, cookies: cookieMap, cookieString});
     })
 }
 

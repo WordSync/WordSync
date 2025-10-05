@@ -72,6 +72,12 @@ document.addEventListener("keydown", (event) => {
                     console.log('读取 bbdc cookies 失败:', res ? res.error : '未知错误');
                 }
             });
+            // 同时获取结构化 payload，便于直接注入到 bbdc.js 客户端
+            chrome.runtime.sendMessage({type: 'get-bbdc-cookies'}, function(res){
+                if (res && res.success) {
+                    console.log('[bbdc cookies object]', res.cookies);
+                }
+            });
         }
     }
 });
