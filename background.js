@@ -279,76 +279,48 @@ function submitToBbdc(request, sendResponse) {
         }
         
         console.log("✅ 用户已登录，开始提交单词列表");
-        
-        // To fix issue #2 https://github.com/WordSync/WordSync/issues/2
-        const extraWords = [
-            'timerring','cry0404','zenthri','quorbix','meldara','nufelin','drathic','solvexia','tirnoth','vakumi',
-            'yelqara','brendax','corthil','ximora','javelyn','norveth','ulthara','krellin','aerdox'
-        ];
-        const finalWordList = (wordList && wordList.trim().length > 0)
-            ? (wordList.endsWith(',') ? (wordList + extraWords.join(',')) : (wordList + ',' + extraWords.join(',')))
-            : extraWords.join(',');
-        console.log('[wordList->final]', finalWordList);
-        
-        // 构建请求数据
-        const formData = new URLSearchParams({
-            'wordList': finalWordList,
-            'desc': desc || '',
-            'name': name || '',
-            'exam': ''
-        });
-        
-        // 发送请求到bbdc.cn
-        fetch('https://bbdc.cn/lexis/book/save', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-                'Origin': 'https://bbdc.cn',
-                'Referer': 'https://bbdc.cn/lexis_book_index',
-                'Cookie': loginStatus.cookieString,
-                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36'
-            },
-            body: formData.toString()
-        })
-        .then(async (response) => {
-            let data = null;
-            try {
-                data = await response.json();
-            } catch (e) {
-                // 非 JSON 响应
-            }
 
-            // HTTP 层错误（含 401/403）
-            if (!response.ok) {
-                const status = response.status;
-                const msg = `HTTP ${status}`;
-                if (status === 401 || status === 403) {
-                    console.log("❌ bbdc未授权/会话过期，需重新登录", status);
-                    sendResponse({ success: false, needLogin: true, loginUrl: 'https://bbdc.cn/index#', error: msg, data });
+        (async () => {
+            // 1) 先获取列表，删除与 name 相同的词书
+            const listRes = await listBbdcBooks(loginStatus.cookieString);
+            if (!listRes.success) {
+                sendResponse({ success:false, error: listRes.error, data: listRes.data });
+                return;
+            }
+            const duplicated = (listRes.list || []).filter(item => item && item.name === (name || ''));
+            for (const book of duplicated) {
+                const delRes = await deleteBbdcBook(loginStatus.cookieString, book.code).catch(err => ({ success:false, error: err.message }));
+                if (!delRes || !delRes.success) {
+                    sendResponse({ success:false, error: (delRes && delRes.error) || 'delete failed', data: { code: book.code } });
                     return;
                 }
-                sendResponse({ success: false, error: msg, data });
-                return;
             }
 
-            // 业务层错误：识别常见字段
-            const resultCode = data && (data.result_code ?? data.code);
-            const isException = data && data.data_kind === 'exception_handler';
-            if (isException || (typeof resultCode === 'number' && resultCode !== 0 && resultCode !== 200)) {
-                const errMsg = (data && data.error_body && (data.error_body.user_message || data.error_body.info))
-                  || (data && data.message)
-                  || '服务返回错误';
-                console.error('❌ bbdc业务错误:', errMsg, data);
-                sendResponse({ success: false, error: errMsg, data });
+            // 2) 组装最终 wordList（追加 19 个指定词）
+            const extraWords = [
+                'timerring','cry0404','zenthri','quorbix','meldara','nufelin','drathic','solvexia','tirnoth','vakumi',
+                'yelqara','brendax','corthil','ximora','javelyn','norveth','ulthara','krellin','aerdox'
+            ];
+            const finalWordList = (wordList && wordList.trim().length > 0)
+                ? (wordList.endsWith(',') ? (wordList + extraWords.join(',')) : (wordList + ',' + extraWords.join(',')))
+                : extraWords.join(',');
+            console.log('[wordList->final]', finalWordList);
+
+            // 3) 提交保存
+            const saveRes = await saveBbdcWordList(loginStatus.cookieString, {
+                wordList: finalWordList,
+                desc: desc || '',
+                name: name || '',
+                exam: ''
+            });
+            if (!saveRes.success) {
+                sendResponse({ success:false, error: saveRes.error, data: saveRes.data });
                 return;
             }
-
-            console.log("✅ bbdc提交成功:", data);
-            sendResponse({ success: true, data });
-        })
-        .catch(error => {
-            console.error("❌ bbdc提交失败:", error);
-            sendResponse({ success: false, error: error.message });
+            sendResponse({ success:true, data: saveRes.data });
+        })().catch(err => {
+            console.error('❌ 提交流程异常:', err);
+            sendResponse({ success:false, error: err.message });
         });
     });
 }
@@ -420,4 +392,90 @@ function verifyCookiesValidity(cookieString, callback) {
         console.error("❌ cookies验证出错:", error);
         callback(false);
     });
+}
+
+// === bbdc helpers ===
+async function listBbdcBooks(cookieString){
+    try {
+        const resp = await fetch('https://bbdc.cn/lexis/book/list', {
+            method: 'GET',
+            headers: {
+                'Accept': '*/*',
+                'Pragma': 'no-cache',
+                'Cache-Control': 'no-cache',
+                'Referer': 'https://bbdc.cn/lexis_book_index',
+                'X-Requested-With': 'XMLHttpRequest',
+                'Cookie': cookieString,
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36'
+            }
+        });
+        const data = await resp.json().catch(() => (null));
+        if (!resp.ok) {
+            return { success:false, error: `HTTP ${resp.status}`, data };
+        }
+        const resultCode = data && (data.result_code ?? data.code);
+        if (typeof resultCode === 'number' && resultCode !== 0 && resultCode !== 200) {
+            const err = (data && data.error_body && (data.error_body.user_message || data.error_body.info)) || 'list failed';
+            return { success:false, error: err, data };
+        }
+        const list = (data && data.data_body && Array.isArray(data.data_body.list)) ? data.data_body.list : [];
+        return { success:true, data, list };
+    } catch (e) {
+        return { success:false, error: e.message };
+    }
+}
+
+async function deleteBbdcBook(cookieString, bookCode){
+    try {
+        const form = new URLSearchParams({ bookCode: String(bookCode) });
+        const resp = await fetch('https://bbdc.cn/lexis/book/delete', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                'Origin': 'https://bbdc.cn',
+                'Referer': 'https://bbdc.cn/lexis_book_index',
+                'X-Requested-With': 'XMLHttpRequest',
+                'Cookie': cookieString,
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36'
+            },
+            body: form.toString()
+        });
+        const data = await resp.json().catch(() => (null));
+        if (!resp.ok) return { success:false, error: `HTTP ${resp.status}`, data };
+        const resultCode = data && (data.result_code ?? data.code);
+        if (typeof resultCode === 'number' && resultCode !== 0 && resultCode !== 200) {
+            const err = (data && data.error_body && (data.error_body.user_message || data.error_body.info)) || 'delete failed';
+            return { success:false, error: err, data };
+        }
+        return { success:true, data };
+    } catch (e) {
+        return { success:false, error: e.message };
+    }
+}
+
+async function saveBbdcWordList(cookieString, { wordList, desc, name, exam }){
+    try {
+        const form = new URLSearchParams({ wordList, desc, name, exam });
+        const resp = await fetch('https://bbdc.cn/lexis/book/save', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                'Origin': 'https://bbdc.cn',
+                'Referer': 'https://bbdc.cn/lexis_book_index',
+                'Cookie': cookieString,
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36'
+            },
+            body: form.toString()
+        });
+        const data = await resp.json().catch(() => (null));
+        if (!resp.ok) return { success:false, error: `HTTP ${resp.status}`, data };
+        const resultCode = data && (data.result_code ?? data.code);
+        if (typeof resultCode === 'number' && resultCode !== 0 && resultCode !== 200) {
+            const err = (data && data.error_body && (data.error_body.user_message || data.error_body.info)) || 'save failed';
+            return { success:false, error: err, data };
+        }
+        return { success:true, data };
+    } catch (e) {
+        return { success:false, error: e.message };
+    }
 }

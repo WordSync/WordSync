@@ -209,7 +209,7 @@ function submitToBbdc(wordList) {
     // 生成当前时间戳作为描述和名称
     const timestamp = getCurrentTimestamp();
     const desc = timestamp;
-    const name = timestamp;
+    const name = 'wordsync';
     
     console.log(`📅 使用时间戳: ${timestamp}`);
     console.log(`📝 提交单词列表: ${wordList}`);
