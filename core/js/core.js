@@ -379,6 +379,9 @@ function addSelectedWord() {
             // 扩展上下文失效，直接保存原词
             Toast.error('Add Failed', 'Extension context invalid');
             sendMsg(seleStr);
+            
+            // 更新高亮显示
+            updateHighlightingAfterAdd(seleStr);
         } else if (response.success) {
             console.log(`✅ 词形还原成功: ${seleStr} → ${response.lemma}`);
             console.log(`📝 上下文: ${context}`);
@@ -391,10 +394,16 @@ function addSelectedWord() {
             
             // 保存还原后的词
             sendMsg(response.lemma);
+            
+            // 更新高亮显示
+            updateHighlightingAfterAdd(response.lemma);
         } else {
             console.warn("AI 词形还原返回异常，保存原词:", response);
             Toast.warning('Word Added', seleStr + ' (original form)', 2500);
             sendMsg(seleStr);
+            
+            // 更新高亮显示
+            updateHighlightingAfterAdd(seleStr);
         }
     });
     
@@ -528,6 +537,310 @@ function getCurrentTimestamp() {
     const hour = String(now.getHours()).padStart(2, '0');
     const minute = String(now.getMinutes()).padStart(2, '0');
     return `${year}${month}${day}${hour}${minute}`;
+}
+
+// === 单词高亮功能 ===
+let addedWords = new Set();
+let isHighlightingEnabled = true;
+
+// 获取单词的各种变体形式（正向生成）
+function getWordVariants(word) {
+    const variants = new Set([word.toLowerCase()]);
+    
+    // 添加原词
+    variants.add(word);
+    variants.add(word.toLowerCase());
+    variants.add(word.toUpperCase());
+    
+    // 处理常见的词形变化
+    const lowerWord = word.toLowerCase();
+    
+    // 复数形式 (简单规则)
+    if (!lowerWord.endsWith('s')) {
+        variants.add(lowerWord + 's');
+        variants.add(lowerWord + 'es');
+    }
+    
+    // 过去式/过去分词 (简单规则)
+    if (lowerWord.endsWith('e')) {
+        variants.add(lowerWord + 'd');
+    } else if (lowerWord.endsWith('y')) {
+        variants.add(lowerWord.slice(0, -1) + 'ied');
+    } else if (lowerWord.endsWith('c')) {
+        variants.add(lowerWord + 'ked');
+    } else {
+        variants.add(lowerWord + 'ed');
+    }
+    
+    // 现在分词
+    if (lowerWord.endsWith('e')) {
+        variants.add(lowerWord + 'ing');
+    } else if (lowerWord.endsWith('y')) {
+        variants.add(lowerWord + 'ing');
+    } else if (lowerWord.endsWith('c')) {
+        variants.add(lowerWord + 'king');
+    } else {
+        variants.add(lowerWord + 'ing');
+    }
+    
+    // 比较级/最高级
+    if (lowerWord.endsWith('y')) {
+        variants.add(lowerWord.slice(0, -1) + 'ier');
+        variants.add(lowerWord.slice(0, -1) + 'iest');
+    } else if (lowerWord.endsWith('e')) {
+        variants.add(lowerWord + 'r');
+        variants.add(lowerWord + 'st');
+    } else {
+        variants.add(lowerWord + 'er');
+        variants.add(lowerWord + 'est');
+    }
+    
+    // 第三人称单数
+    if (lowerWord.endsWith('s') || lowerWord.endsWith('sh') || lowerWord.endsWith('ch') || lowerWord.endsWith('x') || lowerWord.endsWith('z')) {
+        variants.add(lowerWord + 'es');
+    } else if (lowerWord.endsWith('y')) {
+        variants.add(lowerWord.slice(0, -1) + 'ies');
+    } else {
+        variants.add(lowerWord + 's');
+    }
+    
+    return Array.from(variants);
+}
+
+// 获取单词的原始形式（反向推导）
+function getWordRoots(word) {
+    const roots = new Set([word.toLowerCase()]);
+    const lowerWord = word.toLowerCase();
+    
+    // 处理复数形式还原
+    if (lowerWord.endsWith('ies')) {
+        // studies -> study
+        roots.add(lowerWord.slice(0, -3) + 'y');
+    } else if (lowerWord.endsWith('es')) {
+        // 检查是否是复数形式
+        const withoutEs = lowerWord.slice(0, -2);
+        if (withoutEs.endsWith('s') || withoutEs.endsWith('sh') || withoutEs.endsWith('ch') || 
+            withoutEs.endsWith('x') || withoutEs.endsWith('z')) {
+            // classes -> class, boxes -> box
+            roots.add(withoutEs);
+        } else {
+            // 普通复数形式
+            roots.add(withoutEs);
+        }
+    } else if (lowerWord.endsWith('s') && lowerWord.length > 3) {
+        // 简单复数形式：traders -> trader
+        roots.add(lowerWord.slice(0, -1));
+    }
+    
+    // 处理过去式还原
+    if (lowerWord.endsWith('ied')) {
+        // studied -> study
+        roots.add(lowerWord.slice(0, -3) + 'y');
+    } else if (lowerWord.endsWith('ed')) {
+        const withoutEd = lowerWord.slice(0, -2);
+        if (withoutEd.endsWith('e')) {
+            // played -> play
+            roots.add(withoutEd);
+        } else {
+            // worked -> work
+            roots.add(withoutEd);
+        }
+    }
+    
+    // 处理现在分词还原
+    if (lowerWord.endsWith('ying')) {
+        // studying -> study
+        roots.add(lowerWord.slice(0, -4) + 'y');
+    } else if (lowerWord.endsWith('ing')) {
+        const withoutIng = lowerWord.slice(0, -3);
+        if (withoutIng.endsWith('e')) {
+            // playing -> play
+            roots.add(withoutIng);
+        } else {
+            // working -> work
+            roots.add(withoutIng);
+        }
+    }
+    
+    // 处理比较级/最高级还原
+    if (lowerWord.endsWith('iest')) {
+        // happiest -> happy
+        roots.add(lowerWord.slice(0, -4) + 'y');
+    } else if (lowerWord.endsWith('ier')) {
+        // happier -> happy
+        roots.add(lowerWord.slice(0, -3) + 'y');
+    } else if (lowerWord.endsWith('est')) {
+        // biggest -> big
+        roots.add(lowerWord.slice(0, -3));
+    } else if (lowerWord.endsWith('er')) {
+        // bigger -> big
+        roots.add(lowerWord.slice(0, -2));
+    }
+    
+    return Array.from(roots);
+}
+
+// 检查单词是否在已添加列表中
+function isWordAdded(word) {
+    const lowerWord = word.toLowerCase();
+    
+    // 直接检查
+    if (addedWords.has(lowerWord)) {
+        return true;
+    }
+    
+    // 检查当前单词的变体是否在已添加列表中
+    const variants = getWordVariants(word);
+    if (variants.some(variant => addedWords.has(variant.toLowerCase()))) {
+        return true;
+    }
+    
+    // 检查当前单词的原始形式是否在已添加列表中
+    const roots = getWordRoots(word);
+    if (roots.some(root => addedWords.has(root.toLowerCase()))) {
+        return true;
+    }
+    
+    // 检查已添加单词的变体是否包含当前单词
+    for (const addedWord of addedWords) {
+        const addedVariants = getWordVariants(addedWord);
+        if (addedVariants.includes(lowerWord)) {
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+// 高亮页面中的单词
+function highlightWords() {
+    if (!isHighlightingEnabled) return;
+    
+    // 获取页面中的所有文本节点
+    const walker = document.createTreeWalker(
+        document.body,
+        NodeFilter.SHOW_TEXT,
+        {
+            acceptNode: function(node) {
+                // 跳过已经在高亮元素内的文本节点
+                if (node.parentElement && node.parentElement.classList.contains('bbdc-highlighted')) {
+                    return NodeFilter.FILTER_REJECT;
+                }
+                // 跳过脚本和样式标签
+                const tagName = node.parentElement?.tagName?.toLowerCase();
+                if (tagName === 'script' || tagName === 'style' || tagName === 'code' || tagName === 'pre') {
+                    return NodeFilter.FILTER_REJECT;
+                }
+                return NodeFilter.FILTER_ACCEPT;
+            }
+        }
+    );
+    
+    const textNodes = [];
+    let node;
+    while (node = walker.nextNode()) {
+        textNodes.push(node);
+    }
+    
+    textNodes.forEach(textNode => {
+        const text = textNode.textContent;
+        const words = text.match(/\b[A-Za-z]+\b/g);
+        
+        if (words && words.length > 0) {
+            let hasHighlightedWords = false;
+            let newHTML = text;
+            
+            words.forEach(word => {
+                if (isWordAdded(word)) {
+                    hasHighlightedWords = true;
+                    newHTML = newHTML.replace(
+                        new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi'),
+                        `<span class="bbdc-highlighted">${word}</span>`
+                    );
+                }
+            });
+            
+            if (hasHighlightedWords) {
+                const wrapper = document.createElement('span');
+                wrapper.innerHTML = newHTML;
+                textNode.parentNode.replaceChild(wrapper, textNode);
+            }
+        }
+    });
+}
+
+// 加载已添加的单词
+function loadAddedWords() {
+    if (chrome.runtime && chrome.runtime.id) {
+        chrome.runtime.sendMessage({type: "get-all-words"}, function(response) {
+            if (chrome.runtime.lastError) {
+                console.error("获取单词列表失败:", chrome.runtime.lastError);
+                return;
+            }
+            
+            if (response && Array.isArray(response)) {
+                addedWords.clear();
+                response.forEach(word => {
+                    if (word && typeof word === 'string') {
+                        addedWords.add(word.toLowerCase());
+                    }
+                });
+                console.log(`[单词高亮] 加载了 ${addedWords.size} 个单词`);
+                
+                // 重新高亮页面
+                highlightWords();
+            }
+        });
+    }
+}
+
+// 添加单词后更新高亮
+function updateHighlightingAfterAdd(word) {
+    if (word && typeof word === 'string') {
+        addedWords.add(word.toLowerCase());
+        console.log(`[单词高亮] 添加新单词: ${word}`);
+        
+        // 重新高亮页面
+        setTimeout(() => {
+            highlightWords();
+        }, 100);
+    }
+}
+
+// 页面加载完成后初始化高亮功能
+function initWordHighlighting() {
+    // 加载已添加的单词
+    loadAddedWords();
+    
+    // 监听页面变化（动态内容）
+    const observer = new MutationObserver(function(mutations) {
+        let shouldRehighlight = false;
+        mutations.forEach(function(mutation) {
+            if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+                shouldRehighlight = true;
+            }
+        });
+        
+        if (shouldRehighlight) {
+            setTimeout(() => {
+                highlightWords();
+            }, 100);
+        }
+    });
+    
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true
+    });
+    
+    console.log('[单词高亮] 初始化完成');
+}
+
+// 在页面加载完成后初始化
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initWordHighlighting);
+} else {
+    initWordHighlighting();
 }
 
 

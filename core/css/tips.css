@@ -163,6 +163,14 @@
   color: #222;
 }
 
+/* 单词高亮样式 */
+.bbdc-highlighted {
+  color: #ff6b35 !important;
+  background: none !important;
+  text-shadow: none !important;
+  box-shadow: none !important;
+}
+
 /* Toast 消息提示样式 */
 .wordsync-toast {
   position: fixed;
