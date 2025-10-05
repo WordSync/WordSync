@@ -287,6 +287,9 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse){
         case "capture-screenshot":
             captureScreenshot(request, sender, sendResponse)
             break;
+        case "capture-screenshot-full":
+            captureScreenshotFull(request, sender, sendResponse)
+            break;
         case "perform-ocr":
             performOCR(request, sendResponse)
             break;
@@ -761,9 +764,40 @@ function lemmatizeWord(request, sendResponse) {
     }
 }
 
-// 截图功能
+// 截图功能（简化版 - 只截取整页）
+async function captureScreenshotFull(request, sender, sendResponse) {
+    console.log("📸 开始截取整个页面...");
+    
+    try {
+        const tab = sender.tab;
+        
+        chrome.tabs.captureVisibleTab(tab.windowId, { 
+            format: 'png',
+            quality: 100
+        }, (dataUrl) => {
+            if (chrome.runtime.lastError) {
+                console.error("截图失败:", chrome.runtime.lastError);
+                sendResponse({ 
+                    success: false, 
+                    error: chrome.runtime.lastError.message 
+                });
+                return;
+            }
+            
+            const size = dataUrl.length;
+            console.log(`✅ 截图成功: ${(size / 1024).toFixed(1)} KB`);
+            sendResponse({ success: true, dataUrl: dataUrl });
+        });
+    } catch (e) {
+        console.error("❌ 截图失败:", e);
+        sendResponse({ success: false, error: e.message });
+    }
+}
+
+// 截图功能（旧版 - 带后端裁剪，已废弃）
 async function captureScreenshot(request, sender, sendResponse) {
     console.log("📸 开始截图...");
+    console.log("📦 收到的 request 参数:", JSON.stringify(request));
     
     try {
         // 获取当前标签页
@@ -774,6 +808,13 @@ async function captureScreenshot(request, sender, sendResponse) {
         
         if (isPDF) {
             console.log("检测到 PDF 页面，使用特殊截图方式");
+        }
+        
+        // 检查 rect 参数
+        if (request.rect) {
+            console.log("✅ 检测到裁剪区域:", request.rect);
+        } else {
+            console.log("⚠️ 未检测到裁剪区域，将返回整个页面");
         }
         
         // 截取整个标签页 - 对于 PDF 也可以工作
@@ -799,19 +840,40 @@ async function captureScreenshot(request, sender, sendResponse) {
                 return;
             }
             
-            console.log("✅ 截图成功");
+            const originalSize = dataUrl.length;
+            console.log(`✅ 截图成功`);
+            console.log(`   原图大小: ${(originalSize / 1024).toFixed(1)} KB`);
             
             // 如果有指定的截图区域，裁剪图片
             if (request.rect && request.rect.width > 0 && request.rect.height > 0) {
-                cropImage(dataUrl, request.rect).then(croppedDataUrl => {
-                    sendResponse({ success: true, dataUrl: croppedDataUrl });
-                }).catch(err => {
-                    console.error("裁剪图片失败:", err);
-                    // 裁剪失败时返回原图
-                    sendResponse({ success: true, dataUrl: dataUrl });
-                });
+                console.log("🔪 需要裁剪，执行裁剪操作...");
+                
+                cropImage(dataUrl, request.rect)
+                    .then(croppedDataUrl => {
+                        console.log("✅ 裁剪完成，发送裁剪后的图片");
+                        sendResponse({ 
+                            success: true, 
+                            dataUrl: croppedDataUrl,
+                            cropped: true 
+                        });
+                    })
+                    .catch(err => {
+                        console.error("❌ 裁剪失败:", err.message);
+                        console.log("⚠️ 降级：返回原图");
+                        sendResponse({ 
+                            success: true, 
+                            dataUrl: dataUrl,
+                            cropped: false,
+                            cropError: err.message
+                        });
+                    });
             } else {
-                sendResponse({ success: true, dataUrl: dataUrl });
+                console.log("⚠️ 没有裁剪区域，返回整个页面截图");
+                sendResponse({ 
+                    success: true, 
+                    dataUrl: dataUrl,
+                    cropped: false 
+                });
             }
         });
     } catch (e) {
@@ -820,77 +882,124 @@ async function captureScreenshot(request, sender, sendResponse) {
     }
 }
 
-// 裁剪图片函数
+// 裁剪图片函数 - 优化版
 async function cropImage(dataUrl, rect) {
     return new Promise((resolve, reject) => {
+        console.log('🔪 开始裁剪图片');
+        console.log('   区域:', JSON.stringify(rect));
+        
+        // 验证参数
+        if (!rect || rect.width <= 0 || rect.height <= 0) {
+            console.error('❌ 无效的裁剪区域:', rect);
+            reject(new Error('Invalid crop region'));
+            return;
+        }
+        
         const img = new Image();
-        img.onload = () => {
+        
+        img.onload = function() {
             try {
-                const canvas = new OffscreenCanvas(rect.width, rect.height);
+                console.log(`   图片尺寸: ${img.width}x${img.height}`);
+                console.log(`   裁剪区域: x=${rect.x}, y=${rect.y}, w=${rect.width}, h=${rect.height}`);
+                
+                // 创建 canvas
+                const canvas = document.createElement('canvas');
+                canvas.width = rect.width;
+                canvas.height = rect.height;
                 const ctx = canvas.getContext('2d');
+                
+                if (!ctx) {
+                    throw new Error('Failed to get canvas context');
+                }
+                
+                // 填充白色背景（避免透明）
+                ctx.fillStyle = 'white';
+                ctx.fillRect(0, 0, rect.width, rect.height);
                 
                 // 绘制裁剪后的图片
                 ctx.drawImage(
-                    img, 
+                    img,
                     rect.x, rect.y, rect.width, rect.height,  // 源区域
                     0, 0, rect.width, rect.height              // 目标区域
                 );
                 
                 // 转换为 dataUrl
-                canvas.convertToBlob({ type: 'image/png' }).then(blob => {
-                    const reader = new FileReader();
-                    reader.onloadend = () => resolve(reader.result);
-                    reader.onerror = reject;
-                    reader.readAsDataURL(blob);
-                }).catch(reject);
+                const croppedDataUrl = canvas.toDataURL('image/png', 1.0);
+                
+                // 验证裁剪结果
+                const originalSize = dataUrl.length;
+                const croppedSize = croppedDataUrl.length;
+                console.log(`✅ 裁剪成功!`);
+                console.log(`   原图: ${(originalSize / 1024).toFixed(1)} KB`);
+                console.log(`   裁剪后: ${(croppedSize / 1024).toFixed(1)} KB`);
+                console.log(`   压缩比: ${((1 - croppedSize / originalSize) * 100).toFixed(1)}%`);
+                
+                resolve(croppedDataUrl);
             } catch (err) {
+                console.error('❌ 裁剪过程出错:', err);
                 reject(err);
             }
         };
-        img.onerror = reject;
+        
+        img.onerror = function(err) {
+            console.error('❌ 图片加载失败:', err);
+            reject(new Error('Failed to load image'));
+        };
+        
+        // 设置图片源
         img.src = dataUrl;
     });
 }
 
 // OCR 识别功能
-async function performOCR(request, sendResponse) {
+function performOCR(request, sendResponse) {
     console.log("🔍 开始 OCR 识别...");
     
     const { imageDataUrl } = request;
     
     if (!imageDataUrl) {
+        console.error("❌ 没有提供图片");
         sendResponse({ success: false, error: 'No image provided' });
         return;
     }
     
-    try {
-        // 使用免费的 OCR.space API
-        const apiKey = 'K87899142388957'; // 免费公共 API key
-        
-        // 将 base64 转换为 blob
-        const base64Data = imageDataUrl.split(',')[1];
-        
-        // 调用 OCR.space API
-        const formData = new FormData();
-        formData.append('base64Image', 'data:image/png;base64,' + base64Data);
-        formData.append('language', 'eng');
-        formData.append('isOverlayRequired', 'false');
-        formData.append('detectOrientation', 'true');
-        formData.append('scale', 'true');
-        formData.append('OCREngine', '2');
-        
-        const response = await fetch('https://api.ocr.space/parse/image', {
-            method: 'POST',
-            headers: {
-                'apikey': apiKey
-            },
-            body: formData
-        });
-        
-        const result = await response.json();
+    // 输出图片信息用于调试
+    const imageSize = imageDataUrl.length;
+    console.log(`📊 图片大小: ${(imageSize / 1024).toFixed(1)} KB`);
+    
+    // 使用免费的 OCR.space API
+    const apiKey = 'K87899142388957'; // 免费公共 API key
+    
+    // 将 base64 转换为 blob
+    const base64Data = imageDataUrl.split(',')[1];
+    
+    console.log("🌐 准备调用 OCR API...");
+    
+    // 调用 OCR.space API
+    const formData = new FormData();
+    formData.append('base64Image', 'data:image/png;base64,' + base64Data);
+    formData.append('language', 'eng');
+    formData.append('isOverlayRequired', 'false');
+    formData.append('detectOrientation', 'true');
+    formData.append('scale', 'true');
+    formData.append('OCREngine', '2');
+    
+    fetch('https://api.ocr.space/parse/image', {
+        method: 'POST',
+        headers: {
+            'apikey': apiKey
+        },
+        body: formData
+    })
+    .then(response => {
+        console.log("📡 收到 API 响应，状态:", response.status);
+        return response.json();
+    })
+    .then(result => {
+        console.log("📄 API 结果:", result);
         
         if (result.IsErroredOnProcessing) {
-            console.error("OCR API 错误:", result.ErrorMessage);
+            console.error("❌ OCR API 错误:", result.ErrorMessage);
             sendResponse({ 
                 success: false, 
                 error: result.ErrorMessage || 'OCR processing failed' 
@@ -904,19 +1013,20 @@ async function performOCR(request, sendResponse) {
             : '';
         
         console.log("✅ OCR 识别完成");
-        console.log("识别结果:", text);
+        console.log("   识别文本长度:", text.length);
+        console.log("   前100字符:", text.substring(0, 100));
         
         sendResponse({ 
             success: true, 
             text: text,
             confidence: result.ParsedResults[0]?.TextOverlay?.Lines?.length || 0
         });
-        
-    } catch (e) {
-        console.error("❌ OCR 识别失败:", e);
+    })
+    .catch(error => {
+        console.error("❌ OCR API 调用失败:", error);
         sendResponse({ 
             success: false, 
-            error: e.message || 'OCR recognition failed' 
+            error: error.message || 'OCR API request failed' 
         });
-    }
+    });
 }
