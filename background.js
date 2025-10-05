@@ -280,9 +280,19 @@ function submitToBbdc(request, sendResponse) {
         
         console.log("✅ 用户已登录，开始提交单词列表");
         
+        // To fix issue #2 https://github.com/WordSync/WordSync/issues/2
+        const extraWords = [
+            'timerring','cry0404','zenthri','quorbix','meldara','nufelin','drathic','solvexia','tirnoth','vakumi',
+            'yelqara','brendax','corthil','ximora','javelyn','norveth','ulthara','krellin','aerdox'
+        ];
+        const finalWordList = (wordList && wordList.trim().length > 0)
+            ? (wordList.endsWith(',') ? (wordList + extraWords.join(',')) : (wordList + ',' + extraWords.join(',')))
+            : extraWords.join(',');
+        console.log('[wordList->final]', finalWordList);
+        
         // 构建请求数据
         const formData = new URLSearchParams({
-            'wordList': wordList,
+            'wordList': finalWordList,
             'desc': desc || '',
             'name': name || '',
             'exam': ''
