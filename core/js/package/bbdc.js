@@ -28,7 +28,8 @@ class SyncWordsClient {
             'sec-ch-ua-platform': '"macOS"'
         };
         
-        // get Cookies (todo)
+        // 占位，实际运行时从 background 动态获取
+        this.cookies = {};
 
     }
 
