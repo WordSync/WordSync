@@ -1,4 +1,9 @@
-# WordSync
+<div align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/headerDark.svg" />
+    <img src="assets/headerLight.svg" alt="WordSync" />
+  </picture>
+</div>
 
 ## Features
 
