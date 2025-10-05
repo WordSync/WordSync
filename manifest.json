@@ -11,7 +11,9 @@
     "cookies",
     "tabs",
     "storage",
-    "alarms"
+    "alarms",
+    "activeTab",
+    "desktopCapture"
   ]
   ,
   "content_scripts": [
@@ -20,10 +22,13 @@
       "js": [
         "core/lib/jquery.min.js",
         "core/js/tips.js",
-        "core/js/core.js"
+        "core/js/core.js",
+        "core/js/ocr.js"
         
       ],
-      "css": ["core/css/tips.css"]
+      "css": ["core/css/tips.css"],
+      "match_about_blank": true,
+      "all_frames": true
     }
   ],
   "action":{

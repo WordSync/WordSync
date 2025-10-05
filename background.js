@@ -5,6 +5,108 @@
  const baiduApi = 'https://sp1.baidu.com/5b11fzupBgM18t7jm9iCKT-xh_/sensearch/selecttext'
  const googleApi = 'https://translate.google.cn/translate_a/single'
  const icibaApi = 'https://dict-mobile.iciba.com/interface/index.php'
+
+/***
+ * 
+ * 词形还原库初始化
+ */
+// 简化版内嵌词形还原器（避免需要额外加载文件）
+class SimpleLemmatizer {
+  constructor() {
+    // 不规则动词映射表（常用的）
+    this.irregularVerbs = {
+      'was': 'be', 'were': 'be', 'been': 'be', 'being': 'be', 'am': 'be', 'is': 'be', 'are': 'be',
+      'had': 'have', 'has': 'have', 'having': 'have',
+      'did': 'do', 'does': 'do', 'doing': 'do', 'done': 'do',
+      'went': 'go', 'gone': 'go', 'going': 'go', 'goes': 'go',
+      'got': 'get', 'gotten': 'get', 'getting': 'get', 'gets': 'get',
+      'made': 'make', 'making': 'make', 'makes': 'make',
+      'said': 'say', 'saying': 'say', 'says': 'say',
+      'took': 'take', 'taken': 'take', 'taking': 'take', 'takes': 'take',
+      'came': 'come', 'coming': 'come', 'comes': 'come',
+      'saw': 'see', 'seen': 'see', 'seeing': 'see', 'sees': 'see',
+      'knew': 'know', 'known': 'know', 'knowing': 'know', 'knows': 'know',
+      'thought': 'think', 'thinking': 'think', 'thinks': 'think',
+      'found': 'find', 'finding': 'find', 'finds': 'find',
+      'gave': 'give', 'given': 'give', 'giving': 'give', 'gives': 'give',
+      'told': 'tell', 'telling': 'tell', 'tells': 'tell',
+      'became': 'become', 'becoming': 'become', 'becomes': 'become',
+      'left': 'leave', 'leaving': 'leave', 'leaves': 'leave',
+      'felt': 'feel', 'feeling': 'feel', 'feels': 'feel',
+      'brought': 'bring', 'bringing': 'bring', 'brings': 'bring',
+      'began': 'begin', 'begun': 'begin', 'beginning': 'begin', 'begins': 'begin',
+      'kept': 'keep', 'keeping': 'keep', 'keeps': 'keep',
+      'wrote': 'write', 'written': 'write', 'writing': 'write', 'writes': 'write',
+      'ran': 'run', 'running': 'run', 'runs': 'run',
+      'ate': 'eat', 'eaten': 'eat', 'eating': 'eat', 'eats': 'eat',
+      'spoke': 'speak', 'spoken': 'speak', 'speaking': 'speak', 'speaks': 'speak',
+      'fell': 'fall', 'fallen': 'fall', 'falling': 'fall', 'falls': 'fall',
+      'bought': 'buy', 'buying': 'buy', 'buys': 'buy',
+      'caught': 'catch', 'catching': 'catch', 'catches': 'catch',
+      'flew': 'fly', 'flown': 'fly', 'flying': 'fly', 'flies': 'fly'
+    };
+    
+    // 不规则复数映射表
+    this.irregularPlurals = {
+      'children': 'child', 'men': 'man', 'women': 'woman', 'people': 'person',
+      'feet': 'foot', 'teeth': 'tooth', 'mice': 'mouse', 'geese': 'goose'
+    };
+  }
+
+  lemmatize(word) {
+    if (!word || typeof word !== 'string') return word;
+    const lowerWord = word.toLowerCase().trim();
+    
+    // 检查不规则形式
+    if (this.irregularVerbs[lowerWord]) return this.irregularVerbs[lowerWord];
+    if (this.irregularPlurals[lowerWord]) return this.irregularPlurals[lowerWord];
+    
+    // 应用规则
+    if (lowerWord.length <= 3) return lowerWord;
+    
+    // -ies -> -y (studies -> study)
+    if (lowerWord.endsWith('ies') && lowerWord.length > 4) {
+      return lowerWord.slice(0, -3) + 'y';
+    }
+    
+    // -es -> base (watches -> watch)
+    if (lowerWord.endsWith('es') && lowerWord.length > 3) {
+      const base = lowerWord.slice(0, -2);
+      if (base.endsWith('ch') || base.endsWith('sh') || base.endsWith('x') || base.endsWith('s')) {
+        return base;
+      }
+    }
+    
+    // -s -> base (cats -> cat)
+    if (lowerWord.endsWith('s') && lowerWord.length > 3 && !lowerWord.endsWith('ss')) {
+      return lowerWord.slice(0, -1);
+    }
+    
+    // -ed -> base (played -> play)
+    if (lowerWord.endsWith('ed') && lowerWord.length > 4) {
+      const base = lowerWord.slice(0, -2);
+      // 双写辅音 (stopped -> stop)
+      if (base.length >= 3 && base[base.length - 1] === base[base.length - 2]) {
+        return base.slice(0, -1);
+      }
+      return base;
+    }
+    
+    // -ing -> base (playing -> play)
+    if (lowerWord.endsWith('ing') && lowerWord.length > 5) {
+      const base = lowerWord.slice(0, -3);
+      // 双写辅音 (running -> run)
+      if (base.length >= 2 && base[base.length - 1] === base[base.length - 2]) {
+        return base.slice(0, -1);
+      }
+      return base;
+    }
+    
+    return lowerWord;
+  }
+}
+
+const lemmatizer = new SimpleLemmatizer();
  
  class Http {
    constructor() {
@@ -178,6 +280,15 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse){
             break;
         case "submit-to-bbdc":
             submitToBbdc(request, sendResponse)
+            break;
+        case "lemmatize-word":
+            lemmatizeWord(request, sendResponse)
+            break;
+        case "capture-screenshot":
+            captureScreenshot(request, sender, sendResponse)
+            break;
+        case "perform-ocr":
+            performOCR(request, sendResponse)
             break;
         default:
             console.log("未匹配")
@@ -605,5 +716,207 @@ async function saveBbdcWordList(cookieString, { wordList, desc, name, exam }){
         return { success:true, data };
     } catch (e) {
         return { success:false, error: e.message };
+    }
+}
+
+// 词形还原处理函数
+function lemmatizeWord(request, sendResponse) {
+    console.log("🔍 开始词形还原处理...");
+    
+    const { word, context, url } = request;
+    
+    if (!word || typeof word !== 'string') {
+        sendResponse({ success: false, error: 'Invalid word', lemma: word });
+        return;
+    }
+    
+    try {
+        // 使用本地词形还原库
+        const lemma = lemmatizer.lemmatize(word.trim());
+        
+        console.log(`✅ 词形还原完成: ${word} → ${lemma}`);
+        if (context) {
+            console.log(`📝 上下文: ${context.substring(0, 100)}...`);
+        }
+        if (url) {
+            console.log(`🔗 来源: ${url}`);
+        }
+        
+        sendResponse({ 
+            success: true, 
+            lemma: lemma,
+            original: word,
+            context: context,
+            url: url
+        });
+    } catch (e) {
+        console.error("❌ 词形还原失败:", e);
+        // 失败时返回原词
+        sendResponse({ 
+            success: true, 
+            lemma: word.toLowerCase(), 
+            original: word,
+            error: e.message 
+        });
+    }
+}
+
+// 截图功能
+async function captureScreenshot(request, sender, sendResponse) {
+    console.log("📸 开始截图...");
+    
+    try {
+        // 获取当前标签页
+        const tab = sender.tab;
+        
+        // 检查是否是 PDF 页面
+        const isPDF = tab.url && (tab.url.endsWith('.pdf') || tab.url.includes('pdf'));
+        
+        if (isPDF) {
+            console.log("检测到 PDF 页面，使用特殊截图方式");
+        }
+        
+        // 截取整个标签页 - 对于 PDF 也可以工作
+        chrome.tabs.captureVisibleTab(tab.windowId, { 
+            format: 'png',
+            quality: 100  // 最高质量，对 OCR 识别有帮助
+        }, (dataUrl) => {
+            if (chrome.runtime.lastError) {
+                console.error("截图失败:", chrome.runtime.lastError);
+                
+                // 如果是权限问题，给出更友好的提示
+                if (chrome.runtime.lastError.message.includes('Cannot access')) {
+                    sendResponse({ 
+                        success: false, 
+                        error: 'Cannot capture this page. Try refreshing the page (F5) first.' 
+                    });
+                } else {
+                    sendResponse({ 
+                        success: false, 
+                        error: chrome.runtime.lastError.message 
+                    });
+                }
+                return;
+            }
+            
+            console.log("✅ 截图成功");
+            
+            // 如果有指定的截图区域，裁剪图片
+            if (request.rect && request.rect.width > 0 && request.rect.height > 0) {
+                cropImage(dataUrl, request.rect).then(croppedDataUrl => {
+                    sendResponse({ success: true, dataUrl: croppedDataUrl });
+                }).catch(err => {
+                    console.error("裁剪图片失败:", err);
+                    // 裁剪失败时返回原图
+                    sendResponse({ success: true, dataUrl: dataUrl });
+                });
+            } else {
+                sendResponse({ success: true, dataUrl: dataUrl });
+            }
+        });
+    } catch (e) {
+        console.error("❌ 截图失败:", e);
+        sendResponse({ success: false, error: e.message });
+    }
+}
+
+// 裁剪图片函数
+async function cropImage(dataUrl, rect) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+            try {
+                const canvas = new OffscreenCanvas(rect.width, rect.height);
+                const ctx = canvas.getContext('2d');
+                
+                // 绘制裁剪后的图片
+                ctx.drawImage(
+                    img, 
+                    rect.x, rect.y, rect.width, rect.height,  // 源区域
+                    0, 0, rect.width, rect.height              // 目标区域
+                );
+                
+                // 转换为 dataUrl
+                canvas.convertToBlob({ type: 'image/png' }).then(blob => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(blob);
+                }).catch(reject);
+            } catch (err) {
+                reject(err);
+            }
+        };
+        img.onerror = reject;
+        img.src = dataUrl;
+    });
+}
+
+// OCR 识别功能
+async function performOCR(request, sendResponse) {
+    console.log("🔍 开始 OCR 识别...");
+    
+    const { imageDataUrl } = request;
+    
+    if (!imageDataUrl) {
+        sendResponse({ success: false, error: 'No image provided' });
+        return;
+    }
+    
+    try {
+        // 使用免费的 OCR.space API
+        const apiKey = 'K87899142388957'; // 免费公共 API key
+        
+        // 将 base64 转换为 blob
+        const base64Data = imageDataUrl.split(',')[1];
+        
+        // 调用 OCR.space API
+        const formData = new FormData();
+        formData.append('base64Image', 'data:image/png;base64,' + base64Data);
+        formData.append('language', 'eng');
+        formData.append('isOverlayRequired', 'false');
+        formData.append('detectOrientation', 'true');
+        formData.append('scale', 'true');
+        formData.append('OCREngine', '2');
+        
+        const response = await fetch('https://api.ocr.space/parse/image', {
+            method: 'POST',
+            headers: {
+                'apikey': apiKey
+            },
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (result.IsErroredOnProcessing) {
+            console.error("OCR API 错误:", result.ErrorMessage);
+            sendResponse({ 
+                success: false, 
+                error: result.ErrorMessage || 'OCR processing failed' 
+            });
+            return;
+        }
+        
+        // 提取识别的文本
+        const text = result.ParsedResults && result.ParsedResults[0] 
+            ? result.ParsedResults[0].ParsedText 
+            : '';
+        
+        console.log("✅ OCR 识别完成");
+        console.log("识别结果:", text);
+        
+        sendResponse({ 
+            success: true, 
+            text: text,
+            confidence: result.ParsedResults[0]?.TextOverlay?.Lines?.length || 0
+        });
+        
+    } catch (e) {
+        console.error("❌ OCR 识别失败:", e);
+        sendResponse({ 
+            success: false, 
+            error: e.message || 'OCR recognition failed' 
+        });
     }
 }

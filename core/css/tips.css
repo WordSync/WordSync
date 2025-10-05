@@ -162,3 +162,114 @@
   font-size: 12px;
   color: #222;
 }
+
+/* Toast 消息提示样式 */
+.wordsync-toast {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: #ffffff;
+  color: #333;
+  padding: 14px 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  z-index: 999999;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 280px;
+  max-width: 400px;
+  opacity: 0;
+  transform: translateX(400px);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+.wordsync-toast.show {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
+}
+
+.wordsync-toast.hide {
+  opacity: 0;
+  transform: translateX(400px);
+}
+
+.wordsync-toast-icon {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.wordsync-toast.success .wordsync-toast-icon {
+  background: #4caf50;
+  color: white;
+}
+
+.wordsync-toast.error .wordsync-toast-icon {
+  background: #f44336;
+  color: white;
+}
+
+.wordsync-toast.info .wordsync-toast-icon {
+  background: #2196f3;
+  color: white;
+}
+
+.wordsync-toast.warning .wordsync-toast-icon {
+  background: #ff9800;
+  color: white;
+}
+
+.wordsync-toast-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.wordsync-toast-title {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #111;
+  margin: 0;
+}
+
+.wordsync-toast-message {
+  font-size: 12px;
+  line-height: 1.4;
+  color: #666;
+  margin: 0;
+}
+
+.wordsync-toast-close {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  color: #999;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  font-size: 18px;
+  line-height: 1;
+  transition: all 0.2s;
+  padding: 0;
+}
+
+.wordsync-toast-close:hover {
+  background: #f5f5f5;
+  color: #333;
+}
