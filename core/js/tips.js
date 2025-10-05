@@ -136,8 +136,119 @@ class Tip {
   modifyTipPosition({top, left, height, width}) {
     if (!this.tipStyle.display || this.tipStyle.display == 'none') 
       this.tipStyle.display = 'block';
+    
+    // 先设置一个临时位置，让翻译框渲染出来以获取实际尺寸
     this.tipStyle.top = top + height + 8 + 'px';
     this.tipStyle.left = left + 'px';
+    
+    // 等待一帧后获取实际尺寸
+    requestAnimationFrame(() => {
+      this.adjustPositionForBoundaries({top, left, height, width});
+    });
+  }
+  
+  /**
+   * 根据边界调整位置
+   * @param {object} param0 
+   */
+  adjustPositionForBoundaries({top, left, height, width}) {
+    // 获取翻译框的实际尺寸
+    const tipRect = this.tip.getBoundingClientRect();
+    const tipWidth = tipRect.width;
+    const tipHeight = tipRect.height;
+    
+    // 获取视口尺寸
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    
+    // 计算初始位置
+    let tipTop = top + height + 8;
+    let tipLeft = left;
+    let showArrowUp = false; // 是否显示向上的箭头
+    
+    // 水平边界检测和调整
+    if (tipLeft + tipWidth > viewportWidth) {
+      // 如果右侧超出，尝试左对齐
+      tipLeft = viewportWidth - tipWidth - 10; // 留10px边距
+      
+      // 如果左侧也超出，则居中对齐
+      if (tipLeft < 10) {
+        tipLeft = Math.max(10, (viewportWidth - tipWidth) / 2);
+      }
+    }
+    
+    // 确保左侧不超出
+    if (tipLeft < 10) {
+      tipLeft = 10;
+    }
+    
+    // 垂直边界检测和调整
+    if (tipTop + tipHeight > viewportHeight) {
+      // 如果下方空间不足，显示在选中文本上方
+      tipTop = top - tipHeight - 8;
+      showArrowUp = true;
+      
+      // 如果上方空间也不足，则显示在视口中央
+      if (tipTop < 10) {
+        tipTop = Math.max(10, (viewportHeight - tipHeight) / 2);
+        showArrowUp = false; // 居中时不显示箭头
+      }
+    }
+    
+    // 确保顶部不超出
+    if (tipTop < 10) {
+      tipTop = 10;
+      showArrowUp = false;
+    }
+    
+    this.tipStyle.top = tipTop + 'px';
+    this.tipStyle.left = tipLeft + 'px';
+    
+    // 调整气泡口位置
+    this.adjustArrowPosition({top, left, height, width}, tipLeft, tipTop, showArrowUp);
+  }
+  
+  /**
+   * 调整气泡口位置
+   * @param {object} selectionRect 选中文本的位置信息
+   * @param {number} tipLeft 翻译框的左边距
+   * @param {number} tipTop 翻译框的顶部位置
+   * @param {boolean} showArrowUp 是否显示向上的箭头
+   */
+  adjustArrowPosition(selectionRect, tipLeft, tipTop, showArrowUp) {
+    const {top, left, height, width} = selectionRect;
+    
+    // 计算选中文本的中心位置
+    const selectionCenterX = left + width / 2;
+    const selectionCenterY = top + height / 2;
+    
+    // 计算箭头应该指向的位置（相对于翻译框）
+    let arrowLeft = selectionCenterX - tipLeft;
+    
+    // 确保箭头在翻译框范围内（留出边距）
+    const arrowMinLeft = 20;
+    const arrowMaxLeft = 300; // 翻译框宽度320px - 20px边距
+    arrowLeft = Math.max(arrowMinLeft, Math.min(arrowMaxLeft, arrowLeft));
+    
+    // 获取箭头元素
+    const arrowElement = this.tip.querySelector('.tip-arrow');
+    if (arrowElement) {
+      // 设置箭头位置
+      arrowElement.style.left = arrowLeft + 'px';
+      
+      // 根据箭头方向调整样式
+      if (showArrowUp) {
+        // 向上箭头：显示在翻译框底部
+        arrowElement.style.top = 'auto';
+        arrowElement.style.bottom = '-16px';
+        arrowElement.style.transform = 'rotate(180deg)';
+      } else {
+        // 向下箭头：显示在翻译框顶部
+        arrowElement.style.top = '-16px';
+        arrowElement.style.bottom = 'auto';
+        arrowElement.style.transform = 'rotate(0deg)';
+      }
+    }
   }
 
   /**
