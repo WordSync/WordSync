@@ -10,6 +10,9 @@ class Tip {
     this.tipStyle = this.tip.style;
     this.tipContainer = this.tip.querySelector('.tip-content');
     this.loading = this.tip.querySelector('#tip-loading-container')
+    this.providerSelect = this.tip.querySelector('#provider-select')
+    this.currentProvider = 'iciba'
+    this.initProvider()
     window.document.body.append(this.tip);
   }
 
@@ -32,18 +35,21 @@ class Tip {
    */
   showFromGoogleApi({ result, rect, now }) {
     let elementArr = []
-    elementArr.push('<h1>'+result.key+'</h1>')
-    result.means.forEach(item => {
-      let val = item.part+" ";
-      let means = [];
-      item.means.forEach(m=>{
-        means.push(m)
-      })
-
-      val = val + means.join(",");
-      let elem = '<p>'+val+'</p>';
-      elementArr.push(elem)
-    });
+    if (result && result.key && Array.isArray(result.means)) {
+      elementArr.push('<h1>'+result.key+'</h1>')
+      result.means.forEach(item => {
+        let val = item.part+" ";
+        let means = [];
+        item.means.forEach(m=>{
+          means.push(m)
+        })
+        val = val + means.join(",");
+        let elem = '<p>'+val+'</p>';
+        elementArr.push(elem)
+      });
+    } else if (typeof result === 'string') {
+      elementArr.push('<p>'+result+'</p>')
+    }
 
     console.log(elementArr)
     this.opTip({
@@ -51,6 +57,28 @@ class Tip {
       rect,
       now
     })
+  }
+
+  /**
+   * iciba 显示tip
+   */
+  showFromIcibaApi({ result, rect, now }) {
+    let elementArr = []
+    if (result && (result.key || result.paraphrase)) {
+      if (result.key) elementArr.push('<h1>'+result.key+'</h1>')
+      if (result.paraphrase) elementArr.push('<p>'+result.paraphrase+'</p>')
+    } else if (typeof result === 'string') {
+      elementArr.push('<p>'+result+'</p>')
+    }
+    this.opTip({ eleArr: elementArr, rect, now })
+  }
+
+  /**
+   * 通用纯文本展示
+   */
+  showGenericText({ text, rect, now }) {
+    const elementArr = [ '<p>'+ (text || '') +'</p>' ]
+    this.opTip({ eleArr: elementArr, rect, now })
   }
 
   showErrorView({msg, now}) {
@@ -119,10 +147,20 @@ class Tip {
     // 创建dom
     let container = `
     <div class="tip-container">
-
-        <button type="button" class="add-btn" id="add-words">添加单词</button>
-        <button type="button" class="audio-btn" id="play-audio">🔊 发音</button>
-       
+        <div class="tip-toolbar">
+          <div class="toolbar-left">
+            <select id="provider-select" class="provider-select">
+              <option value="iciba">iciba</option>
+              <option value="baidu">baidu</option>
+              <option value="google">google</option>
+            </select>
+          </div>
+          <div class="toolbar-right">
+            <button type="button" class="audio-btn" id="play-audio">发音</button>
+            <button type="button" class="add-btn" id="add-words">添加单词</button>
+          </div>
+        </div>
+        
         <div class="tip-content">
         </div>
         <div class="bouncing-loader" id="tip-loading-container">
@@ -142,6 +180,56 @@ class Tip {
     dom.addEventListener('mouseup', (event) => event.stopPropagation())
 
     return dom;
+  }
+
+  /**
+   * provider 初始化与持久化
+   */
+  initProvider() {
+    const select = this.providerSelect
+    if (!select) return
+    // 从存储读取
+    try {
+      chrome.storage.sync.get('ws_provider', (data) => {
+        const value = data && data.ws_provider
+        if (value) {
+          this.currentProvider = value
+          select.value = value
+        } else {
+          this.currentProvider = 'iciba'
+          select.value = 'iciba'
+        }
+      })
+    } catch(e) {}
+
+    // 监听变更并写入
+    select.addEventListener('change', () => {
+      this.currentProvider = select.value
+      try {
+        chrome.storage.sync.set({ ws_provider: this.currentProvider })
+      } catch(e) {}
+    })
+  }
+
+  getProvider() {
+    return this.currentProvider || 'iciba'
+  }
+
+  /**
+   * 根据 provider 分发渲染
+   */
+  showByProvider({ provider, payload, rect, now }) {
+    switch (provider) {
+      case 'baidu':
+        return this.showFromBaiduApi({ resList: payload, rect, now })
+      case 'iciba':
+        return this.showFromIcibaApi({ result: payload, rect, now })
+      case 'google':
+        if (typeof payload === 'string') return this.showGenericText({ text: payload, rect, now })
+        return this.showFromGoogleApi({ result: payload, rect, now })
+      default:
+        return this.showGenericText({ text: 'No result', rect, now })
+    }
   }
 
  

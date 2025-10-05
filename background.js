@@ -158,7 +158,7 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse){
             break;
 
         case "translate":
-            translate(request.msg,sendResponse)
+            translate(request, sendResponse)
             break;
         case "log-bbdc-cookies":
             logBbdcCookies(sendResponse)
@@ -247,14 +247,34 @@ function getAllWords(sendResponse){
     })
 }
 
-function translate(word,sendResponse){
-    Promise.all([http.googleRequest(word),http.baiduRequest(word),http.icibaRequest(word)]).then(([google,baidu,iciba]) => {
-        console.log(google)
-        console.log(baidu)
-        console.log(iciba)
-        sendResponse(iciba)
-      })
-    
+function translate(request, sendResponse){
+    const word = request && request.msg;
+    const provider = (request && request.provider) || 'iciba';
+    if (!word || typeof word !== 'string' || !word.trim()) {
+        sendResponse({ provider, payload: 'Invalid word' });
+        return;
+    }
+    switch (provider) {
+        case 'google':
+            http.googleRequest(word).then(result => {
+                console.log('[google]', result)
+                sendResponse({ provider: 'google', payload: result })
+            })
+            break;
+        case 'baidu':
+            http.baiduRequest(word).then(result => {
+                console.log('[baidu]', result)
+                sendResponse({ provider: 'baidu', payload: result })
+            })
+            break;
+        case 'iciba':
+        default:
+            http.icibaRequest(word).then(result => {
+                console.log('[iciba]', result)
+                sendResponse({ provider: 'iciba', payload: result })
+            })
+            break;
+    }
 }
 
 // 提交到bbdc的函数
