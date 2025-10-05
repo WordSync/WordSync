@@ -19,8 +19,9 @@ const [triggerTranslate, immediatelyStop] = debounce(async () => {
   if (!regx.test(seleStr)) return tip.hide();
 
   // 检查扩展上下文是否有效
-  if (chrome.runtime && chrome.runtime.id) {
-    chrome.runtime.sendMessage({type: "translate",msg:seleStr}, function(response) {
+  if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
+    try {
+      chrome.runtime.sendMessage({type: "translate", msg: seleStr, provider: tip.getProvider()}, function(response) {
       if (chrome.runtime.lastError) {
         console.error("扩展通信错误:", chrome.runtime.lastError);
         return;
@@ -28,8 +29,15 @@ const [triggerTranslate, immediatelyStop] = debounce(async () => {
       console.log(response);
       const now = Date.now();
       tip.showEmptyView(rect, now);
-      tip.showFromGoogleApi({ result: response, rect, now });
-    });
+      if (response && response.provider) {
+        tip.showByProvider({ provider: response.provider, payload: response.payload, rect, now });
+      } else {
+        tip.showByProvider({ provider: 'iciba', payload: response, rect, now });
+      }
+      });
+    } catch (e) {
+      console.error('扩展通信错误:', e);
+    }
   } else {
     console.error("扩展上下文无效，无法发送消息");
   }
@@ -40,16 +48,11 @@ const [triggerTranslate, immediatelyStop] = debounce(async () => {
 document.addEventListener("keydown", (event) => {
     console.log("键盘事件:", event.key, "Alt:", event.altKey, "Meta:", event.metaKey, "Code:", event.code);
     
-    // 检查是否按下 Option + W (Mac) 或 Alt + W (Windows/Linux)
-    if ((event.altKey || event.metaKey) && event.code === 'KeyW') {
+    // 严格匹配 Alt/Option + W，避免被页面快捷键覆盖或误拦截 Cmd+W
+    const isAltW = event.altKey && !event.metaKey && !event.ctrlKey &&
+                   (event.code === 'KeyW' || (event.key && event.key.toLowerCase() === 'w'));
+    if (isAltW) {
         console.log("组合键触发！");
-        event.preventDefault(); // 阻止默认行为
-        triggerTranslate();
-    }
-    
-    // 备用快捷键: Ctrl + W (Windows/Linux) 或 Cmd + W (Mac)
-    if ((event.ctrlKey || event.metaKey) && event.code === 'KeyW') {
-        console.log("备用组合键触发！");
         event.preventDefault(); // 阻止默认行为
         triggerTranslate();
     }
@@ -60,7 +63,7 @@ document.addEventListener("keydown", (event) => {
         event.preventDefault(); // 阻止默认行为
         outputWordsList();
         // 额外：输出 bbdc.cn cookies 便于排查
-        if (chrome.runtime && chrome.runtime.id) {
+        if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
             chrome.runtime.sendMessage({type: 'log-bbdc-cookies'}, function(res){
                 if (chrome.runtime.lastError) {
                     console.error('读取 bbdc cookies 失败:', chrome.runtime.lastError);
@@ -80,7 +83,7 @@ document.addEventListener("keydown", (event) => {
             });
         }
     }
-});
+}, true);
 
 
 
@@ -120,7 +123,7 @@ function debounce(fun) {
 
 function sendMsg(msg){
     // 检查扩展上下文是否有效
-    if (chrome.runtime && chrome.runtime.id) {
+    if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
         chrome.runtime.sendMessage({type: "add-words",msg:msg}, function(response) {
             if (chrome.runtime.lastError) {
                 console.error("扩展通信错误:", chrome.runtime.lastError);
@@ -165,7 +168,7 @@ function playAudio(word) {
 // 输出单词列表到控制台并执行bbdc提交
 function outputWordsList() {
     // 检查扩展上下文是否有效
-    if (chrome.runtime && chrome.runtime.id) {
+    if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
         chrome.runtime.sendMessage({type: "get-all-words"}, function(response) {
             if (chrome.runtime.lastError) {
                 console.error("获取单词列表失败:", chrome.runtime.lastError);
@@ -215,7 +218,7 @@ function submitToBbdc(wordList) {
     console.log(`📝 提交单词列表: ${wordList}`);
     
     // 发送消息到background script执行bbdc提交
-    if (chrome.runtime && chrome.runtime.id) {
+    if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
         chrome.runtime.sendMessage({
             type: "submit-to-bbdc",
             wordList: wordList,
