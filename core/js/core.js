@@ -57,6 +57,15 @@ document.addEventListener("keydown", (event) => {
         triggerTranslate();
     }
     
+    // 检查是否按下 Option + A (Mac) 或 Alt + A (Windows/Linux) - 添加单词
+    const isAltA = event.altKey && !event.metaKey && !event.ctrlKey &&
+                   (event.code === 'KeyA' || (event.key && event.key.toLowerCase() === 'a'));
+    if (isAltA) {
+        console.log("添加单词快捷键触发！");
+        event.preventDefault(); // 阻止默认行为
+        addSelectedWord();
+    }
+    
     // 检查是否按下 Option + Q (Mac) 或 Alt + Q (Windows/Linux) - 输出单词列表
     if ((event.altKey || event.metaKey) && event.code === 'KeyQ') {
         console.log("输出单词列表快捷键触发！");
@@ -136,11 +145,29 @@ function sendMsg(msg){
     }
 }
 
-  // 添加单词
-$('#add-words').on('click', function(){
+// 添加选中单词的函数（用于快捷键）
+function addSelectedWord() {
     let { rect, seleStr = "" } = getSelectPos();
+    if (!seleStr.trim()) {
+        console.log("没有选中任何文本");
+        return;
+    }
+    
+    // 英语单词正则
+    let regx = /^[A-Za-z]+$/
+    if (!regx.test(seleStr)) {
+        console.log("选中的文本不是有效的英文单词:", seleStr);
+        return;
+    }
+    
+    console.log("通过快捷键添加单词:", seleStr);
     sendMsg(seleStr);
     tip.hide();
+}
+
+// 添加单词按钮点击事件
+$('#add-words').on('click', function(){
+    addSelectedWord();
 })
 
 // 播放音频
