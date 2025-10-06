@@ -2,37 +2,41 @@
   "name": "Wordsync",
   "description": "添加单词到词库，可以上传到『不背单词』自定义词库",
   "version": "1.0",
-  "manifest_version": 3,
-  "background":{
-    "service_worker": "background.js"
+  "manifest_version": 2,
+  "background": {
+    "scripts": ["background.js"],
+    "persistent": true
   },
-  "host_permissions":["<all_urls>"],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "cry@sadcoder.me",
+      "strict_min_version": "78.0"
+    }
+  },
   "permissions": [
     "cookies",
     "tabs",
     "storage",
     "alarms",
     "activeTab",
-    "desktopCapture"
-  ]
-  ,
+    "<all_urls>"
+  ],
   "content_scripts": [
     {
-      "matches":  ["<all_urls>"],
+      "matches": ["<all_urls>"],
       "js": [
+        "polyfill.js",
         "core/lib/jquery.min.js",
         "core/js/tips.js",
         "core/js/core.js",
         "core/js/ocr.js"
-        
       ],
       "css": ["core/css/tips.css"],
       "match_about_blank": true,
       "all_frames": true
     }
   ],
-  "action":{
+  "browser_action": {
     "default_popup": "core/html/popup.html"
   }
-
 }

@@ -528,15 +528,10 @@ function submitToBbdc(wordList) {
     });
 }
 
-// 生成当前时间戳 (格式: YYYYMMDDHHMM)
+// 生成当前时间戳 (格式: wordsync + Unix时间戳)
 function getCurrentTimestamp() {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    const hour = String(now.getHours()).padStart(2, '0');
-    const minute = String(now.getMinutes()).padStart(2, '0');
-    return `${year}${month}${day}${hour}${minute}`;
+    const unixTimestamp = Math.floor(Date.now() / 1000);
+    return `wordsync${unixTimestamp}`;
 }
 
 // === 单词高亮功能 ===

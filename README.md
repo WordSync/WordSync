@@ -5,8 +5,18 @@
   </picture>
 
 **Your Vocab Grows Where You Learn.**
+
+[![Chrome](https://img.shields.io/badge/Chrome-✓-green.svg)](https://www.google.com/chrome/)
+[![Firefox](https://img.shields.io/badge/Firefox-✓-orange.svg)](https://www.mozilla.org/firefox/)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
   
 </div>
+
+## Browser Support
+
+WordSync now supports both **Chrome** and **Firefox** browsers:
+
+The extension automatically detects your browser and uses the appropriate APIs.
 
 ## Features
 

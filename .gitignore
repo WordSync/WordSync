@@ -1,1 +1,4 @@
 .DS_Store
+*.sh
+Firefox_Install.md
+.firefoxignore

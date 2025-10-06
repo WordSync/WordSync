@@ -140,27 +140,22 @@ class SyncWordsClient {
     }
 
     /**
-     * 生成当前时间戳 (格式: YYYYMMDDHHMM)
+     * 生成当前时间戳 (格式: wordsync + Unix时间戳)
      */
     getCurrentTimestamp() {
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const day = String(now.getDate()).padStart(2, '0');
-        const hour = String(now.getHours()).padStart(2, '0');
-        const minute = String(now.getMinutes()).padStart(2, '0');
-        return `${year}${month}${day}${hour}${minute}`;
+        const unixTimestamp = Math.floor(Date.now() / 1000);
+        return `wordsync${unixTimestamp}`;
     }
 
     async syncWords(fileContent = '', filename = '/Users/jonghowe/Repo/syncwords/random_words.txt', desc = null, name = null, exam = '') {
-        console.log('🔄 开始词汇同步流程...');
+
         
         // 如果没有提供desc和name，使用当前时间戳
         const timestamp = this.getCurrentTimestamp();
         const finalDesc = desc || timestamp;
         const finalName = name || timestamp;
         
-        console.log(`📅 使用时间戳: ${timestamp}`);
+
         
         let wordList;
         wordList = 'good,better,bridge,candle,dolphin,emerald,feather,galaxy,harbor,island,jungle,kingdom,lantern,meadow,nebula,ocean,prairie,quartz,raven,Saturn,thunder,umbrella,voyage,willow,xenon,yonder,zephyr,blossom,comet,drift,ember';
@@ -173,7 +168,7 @@ class SyncWordsClient {
             return false;
         }
         
-        console.log('🎉 词汇同步流程完成!');
+
         return true;
     }
 }

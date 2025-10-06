@@ -1,3 +1,12 @@
+/**
+ * Browser API Polyfill - 兼容 Chrome 和 Firefox
+ */
+if (typeof browser === 'undefined' && typeof chrome !== 'undefined') {
+  globalThis.browser = chrome;
+} else if (typeof chrome === 'undefined' && typeof browser !== 'undefined') {
+  globalThis.chrome = browser;
+}
+
 /***
  * 
  * 翻译 API
@@ -589,13 +598,8 @@ chrome.alarms && chrome.alarms.onAlarm.addListener((alarm) => {
 });
 
 function getCurrentTimestampForBg(){
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    const hour = String(now.getHours()).padStart(2, '0');
-    const minute = String(now.getMinutes()).padStart(2, '0');
-    return `${year}${month}${day}${hour}${minute}`;
+    const unixTimestamp = Math.floor(Date.now() / 1000);
+    return `wordsync${unixTimestamp}`;
 }
 
 function performAutoSync(){
@@ -794,93 +798,7 @@ async function captureScreenshotFull(request, sender, sendResponse) {
     }
 }
 
-// 截图功能（旧版 - 带后端裁剪，已废弃）
-async function captureScreenshot(request, sender, sendResponse) {
-    console.log("📸 开始截图...");
-    console.log("📦 收到的 request 参数:", JSON.stringify(request));
-    
-    try {
-        // 获取当前标签页
-        const tab = sender.tab;
-        
-        // 检查是否是 PDF 页面
-        const isPDF = tab.url && (tab.url.endsWith('.pdf') || tab.url.includes('pdf'));
-        
-        if (isPDF) {
-            console.log("检测到 PDF 页面，使用特殊截图方式");
-        }
-        
-        // 检查 rect 参数
-        if (request.rect) {
-            console.log("✅ 检测到裁剪区域:", request.rect);
-        } else {
-            console.log("⚠️ 未检测到裁剪区域，将返回整个页面");
-        }
-        
-        // 截取整个标签页 - 对于 PDF 也可以工作
-        chrome.tabs.captureVisibleTab(tab.windowId, { 
-            format: 'png',
-            quality: 100  // 最高质量，对 OCR 识别有帮助
-        }, (dataUrl) => {
-            if (chrome.runtime.lastError) {
-                console.error("截图失败:", chrome.runtime.lastError);
-                
-                // 如果是权限问题，给出更友好的提示
-                if (chrome.runtime.lastError.message.includes('Cannot access')) {
-                    sendResponse({ 
-                        success: false, 
-                        error: 'Cannot capture this page. Try refreshing the page (F5) first.' 
-                    });
-                } else {
-                    sendResponse({ 
-                        success: false, 
-                        error: chrome.runtime.lastError.message 
-                    });
-                }
-                return;
-            }
-            
-            const originalSize = dataUrl.length;
-            console.log(`✅ 截图成功`);
-            console.log(`   原图大小: ${(originalSize / 1024).toFixed(1)} KB`);
-            
-            // 如果有指定的截图区域，裁剪图片
-            if (request.rect && request.rect.width > 0 && request.rect.height > 0) {
-                console.log("🔪 需要裁剪，执行裁剪操作...");
-                
-                cropImage(dataUrl, request.rect)
-                    .then(croppedDataUrl => {
-                        console.log("✅ 裁剪完成，发送裁剪后的图片");
-                        sendResponse({ 
-                            success: true, 
-                            dataUrl: croppedDataUrl,
-                            cropped: true 
-                        });
-                    })
-                    .catch(err => {
-                        console.error("❌ 裁剪失败:", err.message);
-                        console.log("⚠️ 降级：返回原图");
-                        sendResponse({ 
-                            success: true, 
-                            dataUrl: dataUrl,
-                            cropped: false,
-                            cropError: err.message
-                        });
-                    });
-            } else {
-                console.log("⚠️ 没有裁剪区域，返回整个页面截图");
-                sendResponse({ 
-                    success: true, 
-                    dataUrl: dataUrl,
-                    cropped: false 
-                });
-            }
-        });
-    } catch (e) {
-        console.error("❌ 截图失败:", e);
-        sendResponse({ success: false, error: e.message });
-    }
-}
+
 
 // 裁剪图片函数 - 优化版
 async function cropImage(dataUrl, rect) {

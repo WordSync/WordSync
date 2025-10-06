@@ -470,21 +470,21 @@ class OCRCapture {
     const wordItems = words.map((word, index) => `
       <label style="display: inline-flex; align-items: center; padding: 6px 10px; margin: 4px; background: white; border: 1px solid #e0e0e0; border-radius: 6px; cursor: pointer; transition: all 0.2s;" data-word-item>
         <input type="checkbox" checked class="word-checkbox" data-word="${word}" style="margin-right: 8px; cursor: pointer; width: 16px; height: 16px;">
-        <span style="font-size: 14px; user-select: none;">${word}</span>
+        <span style="font-size: 14px; color: #333; font-weight: 500; user-select: none;">${word}</span>
       </label>
     `).join('');
 
     dialog.innerHTML = `
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-        <h3 style="margin: 0; font-size: 18px; color: #111;">Extracted Words (<span id="selected-count">${words.length}</span>/${words.length})</h3>
-        <button id="toggle-all" style="padding: 6px 12px; border: 1px solid #ddd; background: white; border-radius: 6px; cursor: pointer; font-size: 13px;">Unselect All</button>
+        <h3 style="margin: 0; font-size: 18px; color: #111; font-weight: 600;">Extracted Words (<span id="selected-count">${words.length}</span>/${words.length})</h3>
+        <button id="toggle-all" style="padding: 6px 12px; border: 1px solid #ddd; background: white; color: #333; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500;">Unselect All</button>
       </div>
       <div id="words-container" style="flex: 1; margin-bottom: 16px; padding: 12px; background: #f5f5f5; border-radius: 8px; max-height: 400px; overflow-y: auto;">
         ${wordItems}
       </div>
       <div style="display: flex; gap: 12px; justify-content: flex-end;">
-        <button id="ocr-cancel" style="padding: 8px 16px; border: 1px solid #ddd; background: white; border-radius: 6px; cursor: pointer; font-size: 14px;">Cancel</button>
-        <button id="ocr-confirm" style="padding: 8px 16px; border: none; background: #2196f3; color: white; border-radius: 6px; cursor: pointer; font-size: 14px;">Add Selected Words</button>
+        <button id="ocr-cancel" style="padding: 8px 16px; border: 1px solid #ddd; background: white; color: #333; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500;">Cancel</button>
+        <button id="ocr-confirm" style="padding: 8px 16px; border: none; background: #2196f3; color: white; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600;">Add Selected Words</button>
       </div>
     `;
 
