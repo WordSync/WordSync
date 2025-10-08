@@ -1,0 +1,23 @@
+curl 'https://bbdc.cn/lexis/book/file/submit' \
+  -H 'Accept: application/json, text/javascript, */*; q=0.01' \
+  -H 'Accept-Language: en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7' \
+  -H 'Cache-Control: no-cache' \
+  -H 'Connection: keep-alive' \
+  -H 'Content-Type: multipart/form-data; boundary=----WebKitFormBoundary0B26zyE053iGIcaz' \
+  -b 'JSESSIONID=XXXX' \
+  -H 'Origin: https://bbdc.cn' \
+  -H 'Pragma: no-cache' \
+  -H 'Referer: https://bbdc.cn/lexis_book_index' \
+  -H 'Sec-Fetch-Dest: empty' \
+  -H 'Sec-Fetch-Mode: cors' \
+  -H 'Sec-Fetch-Site: same-origin' \
+  -H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36' \
+  -H 'X-Requested-With: XMLHttpRequest' \
+  -H 'sec-ch-ua: "Not;A=Brand";v="99", "Google Chrome";v="139", "Chromium";v="139"' \
+  -H 'sec-ch-ua-mobile: ?0' \
+  -H 'sec-ch-ua-platform: "macOS"' \
+  --data-raw $'------WebKitFormBoundary0B26zyE053iGIcaz\r\nContent-Disposition: form-data; name="file"; filename="random_words.txt"\r\nContent-Type: text/plain\r\n\r\n\r\n------WebKitFormBoundary0B26zyE053iGIcaz--\r\n'
+
+
+RESPONSE
+  {"result_code":200,"data_kind":"","data_version":"1.0","data_body":{"unknowList":"","knowList":"apple,bridge,candle,dolphin,emerald,feather,galaxy,harbor,island,jungle,kingdom,lantern,meadow,nebula,ocean,prairie,quartz,raven,Saturn,thunder,umbrella,voyage,willow,xenon,yonder,zephyr,blossom,comet,drift,ember"}}

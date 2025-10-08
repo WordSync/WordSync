@@ -1,0 +1,16 @@
+curl 'https://bbdc.cn/lexis/book/list' \
+  -H 'Accept: */*' \
+  -H 'Accept-Language: en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7' \
+  -H 'Cache-Control: no-cache' \
+  -H 'Connection: keep-alive' \
+  -b 'JSESSIONID=XXXX.tomcat2; Hm_lvt_2xxx=XXXX; HMACCOUNT=XXXXXXX; hanhan=XXXXXXX; acw_tc=XXXXXXX; Hm_lpvt_2xxx=XXXX' \
+  -H 'Pragma: no-cache' \
+  -H 'Referer: https://bbdc.cn/lexis_book_index' \
+  -H 'Sec-Fetch-Dest: empty' \
+  -H 'Sec-Fetch-Mode: cors' \
+  -H 'Sec-Fetch-Site: same-origin' \
+  -H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36' \
+  -H 'X-Requested-With: XMLHttpRequest' \
+  -H 'sec-ch-ua: "Chromium";v="140", "Not=A?Brand";v="24", "Google Chrome";v="140"' \
+  -H 'sec-ch-ua-mobile: ?0' \
+  -H 'sec-ch-ua-platform: "macOS"'
